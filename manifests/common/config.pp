@@ -4,6 +4,7 @@ class slurm::common::config {
   create_resources('slurm::spank', $slurm::spank_plugins)
 
   if $slurm::manage_slurm_conf {
+<<<<<<< HEAD
     file { 'slurm.conf':
       ensure  => 'present',
       path    => $slurm::slurm_conf_path,
@@ -42,8 +43,48 @@ class slurm::common::config {
         group    => 'root',
         mode     => '0644',
       }
+=======
 
-      Datacat_fragment <<| tag == $slurm::slurm_nodelist_tag |>>
+    if $slurm::manage_slurm_conf_nfs_mount {
+
+      if !$slurm::controller {
+        file { 'SlurmConfNFSMountPoint':
+          ensure  => 'directory',
+          path    => $slurm::slurm_conf_nfs_location,
+        }
+
+        mount { 'SlurmConfNFSMount':
+          ensure  => 'mounted',
+          name    => $slurm::slurm_conf_nfs_location,
+          atboot  => true,
+          device  => $slurm::slurm_conf_nfs_device,
+          fstype  => 'nfs',
+          options => $slurm::slurm_conf_nfs_options,
+          require => File['SlurmConfNFSMountPoint'],
+        }
+>>>>>>> c27add9aa2f827d030815598b6eb2099887daef8
+
+        file { 'slurm.conf':
+          ensure  => 'link',
+          path    => $slurm::slurm_conf_path,
+          target  => "${slurm::slurm_conf_nfs_location}/slurm.conf",
+          require => Mount['SlurmConfNFSMount'],
+        }
+
+        file { 'slurm-partitions.conf':
+          ensure  => 'link',
+          path    => $slurm::partition_conf_path,
+          target  => "${slurm::slurm_conf_nfs_location}/partitions.conf",
+          require => Mount['SlurmConfNFSMount'],
+        }
+
+        file { 'Link slurm-nodes.conf':
+          ensure => 'link',
+          path   => $slurm::node_conf_path,
+          target => "${slurm::slurm_conf_nfs_location}/nodes.conf",
+          require => Mount['SlurmConfNFSMount'],
+        }
+      }
     }
 
     file { 'plugstack.conf.d':
@@ -87,7 +128,7 @@ class slurm::common::config {
 
   sysctl { 'net.core.somaxconn':
     ensure => present,
-    value  => '1024',
+    val    => '1024',
   }
 
 }

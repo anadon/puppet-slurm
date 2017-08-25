@@ -57,11 +57,10 @@ RSpec.configure do |c|
     on hosts, puppet('module', 'install', 'puppetlabs-firewall'), { :acceptable_exit_codes => [0,1] }
     on hosts, puppet('module', 'install', 'puppetlabs-mysql'), { :acceptable_exit_codes => [0,1] }
     on hosts, puppet('module', 'install', 'richardc-datacat'), { :acceptable_exit_codes => [0,1] }
-    on hosts, puppet('module', 'install', 'herculesteam-augeasproviders_sysctl'), { :acceptable_exit_codes => [0,1] }
+    on hosts, puppet('module', 'install', 'duritong/sysctl'), { :acceptable_exit_codes => [0,1] }
     on hosts, puppet('module', 'install', 'rodjek-logrotate'), { :acceptable_exit_codes => [0,1] }
     on hosts, puppet('module', 'install', 'stahnma-epel'), { :acceptable_exit_codes => [0,1] }
     on hosts, puppet('module', 'install', 'puppetlabs-puppetdb'), { :acceptable_exit_codes => [0,1] }
-    on hosts, puppet('module', 'install', 'saz-limits'), { :acceptable_exit_codes => [0,1] }
     on hosts, puppet('module', 'install', 'treydock-munge'), { :acceptable_exit_codes => [0,1] }
 
     puppet_pp = <<-EOF

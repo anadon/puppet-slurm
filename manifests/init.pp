@@ -44,9 +44,11 @@ class slurm (
   $manage_scripts                = true,
   $manage_firewall               = true,
   $manage_logrotate              = true,
+  $logrotate_slurm_prerotate     = undef,
   $logrotate_slurm_postrotate    = undef,
   $logrotate_slurmdbd_postrotate = undef,
   $use_syslog                    = false,
+  $manage_slurm_conf_nfs_mount   = false,
 
   # Behavior overrides - controller
   $manage_state_dir_nfs_mount           = false,
@@ -61,6 +63,9 @@ class slurm (
   $state_dir_nfs_options          = 'rw,sync,noexec,nolock,auto',
   $job_checkpoint_dir_nfs_device  = undef,
   $job_checkpoint_dir_nfs_options = 'rw,sync,noexec,nolock,auto',
+  $slurm_conf_nfs_device          = undef,
+  $slurm_conf_nfs_options         = 'rw,sync,noexec,nolock,auto',
+
 
   # Cluster config
   $cluster_name       = 'linux',
@@ -100,6 +105,7 @@ class slurm (
   $tmp_disk         = '16000',
   $node_weight      = 'UNSET',
   $feature          = 'UNSET',
+  $gres             = 'UNSET',
   $state            = 'UNKNOWN',
   $slurmd_log_file  = '/var/log/slurm/slurmd.log',
   $slurmd_spool_dir = '/var/spool/slurmd',
@@ -108,6 +114,7 @@ class slurm (
   $job_checkpoint_dir     = '/var/lib/slurm/checkpoint',
   $slurmctld_log_file     = '/var/log/slurm/slurmctld.log',
   $state_save_location    = '/var/lib/slurm/state',
+  $slurm_conf_nfs_location = '/var/lib/slurm/etc',
 
   # slurmdbd.conf
   $slurmdbd_log_file      = '/var/log/slurm/slurmdbd.log',
@@ -117,12 +124,14 @@ class slurm (
   $slurmdbd_storage_port  = '3306',
   $slurmdbd_storage_type  = 'accounting_storage/mysql',
   $slurmdbd_storage_user  = 'slurmdbd',
+  $slurmdbd_archive_dir   = '/var/lib/slurm/archive',
   $slurmdbd_conf_override = $slurm::params::slurmdbd_conf_override,
 
   # slurm.conf - epilog/prolog
   $manage_epilog                = true,
   $epilog                       = undef,
   $epilog_source                = undef,
+  $manage_health_check          = true,
   $health_check_program         = undef,
   $health_check_program_source  = undef,
   $manage_prolog                = true,
@@ -134,6 +143,15 @@ class slurm (
   $manage_task_prolog           = true,
   $task_prolog                  = undef,
   $task_prolog_source           = undef,
+  $manage_job_comp              = true,
+  $job_comp                     = undef,
+  $job_comp_source              = undef,
+  $manage_slurmctld_prolog      = true,
+  $slurmctld_prolog             = undef,
+  $slurmctld_prolog_source      = undef,
+  $manage_job_submit_plugin     = true,
+  $job_submit_plugin            = undef,
+  $job_submit_plugin_lua_source = undef,
 
   # cgroups
   $cgroup_conf_template             = 'slurm/cgroup/cgroup.conf.erb',
@@ -168,7 +186,10 @@ class slurm (
 ) inherits slurm::params {
 
   # Parameter validations
-  validate_bool($node, $controller, $slurmdbd, $client)
+  validate_bool($controller)
+  validate_bool($slurmdbd)
+  validate_bool($client)
+  validate_bool($node)
   validate_bool($manage_slurm_user, $manage_slurm_conf, $manage_scripts, $manage_firewall, $manage_logrotate, $use_syslog)
   validate_bool($install_pam, $install_torque_wrapper, $install_lua, $install_blcr)
   validate_bool($manage_state_dir_nfs_mount, $manage_job_checkpoint_dir_nfs_mount)
@@ -185,7 +206,9 @@ class slurm (
 
   validate_array($service_ulimits, $partitionlist, $cgroup_allowed_devices)
 
-  validate_hash($slurm_conf_override, $slurmdbd_conf_override, $spank_plugins)
+  validate_hash($slurm_conf_override)
+  validate_hash($slurmdbd_conf_override)
+  validate_hash($spank_plugins)
 
   if $node and $controller {
     fail("Module ${module_name}: Does not support both node and controller being enabled on the same host.")
@@ -234,8 +257,18 @@ class slurm (
       $slurmdbd_conf_release_defaults = $slurm::params::slurmdbd_conf_defaults['15.08']
       $partition_keys                 = $slurm::params::partition_keys['15.08']
     }
+    '16.05': {
+      $slurm_conf_release_defaults    = $slurm::params::slurm_conf_defaults['16.05']
+      $slurmdbd_conf_release_defaults = $slurm::params::slurmdbd_conf_defaults['16.05']
+      $partition_keys                 = $slurm::params::partition_keys['16.05']
+    }
+    '17.02': {
+      $slurm_conf_release_defaults    = $slurm::params::slurm_conf_defaults['17.02']
+      $slurmdbd_conf_release_defaults = $slurm::params::slurmdbd_conf_defaults['17.02']
+      $partition_keys                 = $slurm::params::partition_keys['17.02']
+    }
     default: {
-      fail("Module ${module_name} only supports release 14.03, 14.11 and 15.08, ${release} given.")
+      fail("Module ${module_name} only supports release 14.03, 14.11, 15.08, 16.05, 17.02 ${release} given.")
     }
   }
 
@@ -243,6 +276,7 @@ class slurm (
     $_slurmctld_log_file = 'UNSET'
     $_slurmdbd_log_file = 'UNSET'
     $_slurmd_log_file = 'UNSET'
+    $_logrotate_slurm_prerotate = pick($logrotate_slurm_prerotate, $slurm::params::logrotate_slurm_prerotate)
     $_logrotate_slurm_postrotate = pick($logrotate_slurm_postrotate, $slurm::params::logrotate_syslog_postrotate)
     $_logrotate_slurmdbd_postrotate = pick($logrotate_slurmdbd_postrotate, $slurm::params::logrotate_syslog_postrotate)
   } else {
@@ -250,6 +284,8 @@ class slurm (
     $_slurmdbd_log_file = $slurmdbd_log_file
     $_slurmd_log_file = $slurmd_log_file
     $_logrotate_slurm_postrotate = pick($logrotate_slurm_postrotate, $slurm::params::logrotate_slurm_postrotate)
+    $_logrotate_slurmctld_postrotate = pick($logrotate_slurmctld_postrotate, $slurm::params::logrotate_slurmctld_postrotate)
+    $_logrotate_slurm_prerotate = pick($logrotate_slurm_prerotate, $slurm::params::logrotate_slurm_prerotate)
     $_logrotate_slurmdbd_postrotate = pick($logrotate_slurmdbd_postrotate, $slurm::params::logrotate_slurmdbd_postrotate)
   }
 
@@ -263,8 +299,11 @@ class slurm (
     'Epilog' => $epilog,
     'HealthCheckProgram' => $health_check_program,
     'JobCheckpointDir' => $job_checkpoint_dir,
+    'JobCompLoc' => $job_comp,
+    'JobSubmitPlugins' => $job_submit_plugin,
     'PlugStackConfig' => $plugstack_conf_path,
     'Prolog' => $prolog,
+    'PrologSlurmctld' => $slurmctld_prolog,
     'SlurmUser' => $slurm_user,
     'SlurmctldLogFile' => $_slurmctld_log_file,
     'SlurmctldPidFile' => "${pid_dir}/slurmctld.pid",
@@ -284,6 +323,7 @@ class slurm (
   $slurm_conf           = merge($slurm_conf_defaults, $slurm_conf_override)
 
   $slurmdbd_conf_local_defaults = {
+    'ArchiveDir' => $slurmdbd_archive_dir,
     'DbdHost' => $::hostname,
     'DbdPort' => $slurmdbd_port,
     'LogFile' => $_slurmdbd_log_file,
@@ -348,33 +388,33 @@ class slurm (
   if $node {
     include slurm::node
 
-    Anchor['slurm::start']->
-    Class['slurm::node']->
-    Anchor['slurm::end']
+    Anchor['slurm::start']
+    -> Class['slurm::node']
+    -> Anchor['slurm::end']
   }
 
   if $controller {
     include slurm::controller
 
-    Anchor['slurm::start']->
-    Class['slurm::controller']->
-    Anchor['slurm::end']
+    Anchor['slurm::start']
+    -> Class['slurm::controller']
+    -> Anchor['slurm::end']
   }
 
   if $slurmdbd {
     include slurm::slurmdbd
 
-    Anchor['slurm::start']->
-    Class['slurm::slurmdbd']->
-    Anchor['slurm::end']
+    Anchor['slurm::start']
+    -> Class['slurm::slurmdbd']
+    -> Anchor['slurm::end']
   }
 
   if $client {
     include slurm::client
 
-    Anchor['slurm::start']->
-    Class['slurm::client']->
-    Anchor['slurm::end']
+    Anchor['slurm::start']
+    -> Class['slurm::client']
+    -> Anchor['slurm::end']
   }
 
 }
