@@ -4,7 +4,6 @@ class slurm::common::config {
   create_resources('slurm::spank', $slurm::spank_plugins)
 
   if $slurm::manage_slurm_conf {
-<<<<<<< HEAD
     file { 'slurm.conf':
       ensure  => 'present',
       path    => $slurm::slurm_conf_path,
@@ -43,14 +42,14 @@ class slurm::common::config {
         group    => 'root',
         mode     => '0644',
       }
-=======
+    }
 
     if $slurm::manage_slurm_conf_nfs_mount {
 
       if !$slurm::controller {
         file { 'SlurmConfNFSMountPoint':
-          ensure  => 'directory',
-          path    => $slurm::slurm_conf_nfs_location,
+          ensure => 'directory',
+          path   => $slurm::slurm_conf_nfs_location,
         }
 
         mount { 'SlurmConfNFSMount':
@@ -62,7 +61,6 @@ class slurm::common::config {
           options => $slurm::slurm_conf_nfs_options,
           require => File['SlurmConfNFSMountPoint'],
         }
->>>>>>> c27add9aa2f827d030815598b6eb2099887daef8
 
         file { 'slurm.conf':
           ensure  => 'link',
@@ -79,9 +77,9 @@ class slurm::common::config {
         }
 
         file { 'Link slurm-nodes.conf':
-          ensure => 'link',
-          path   => $slurm::node_conf_path,
-          target => "${slurm::slurm_conf_nfs_location}/nodes.conf",
+          ensure  => 'link',
+          path    => $slurm::node_conf_path,
+          target  => "${slurm::slurm_conf_nfs_location}/nodes.conf",
           require => Mount['SlurmConfNFSMount'],
         }
       }
@@ -126,9 +124,10 @@ class slurm::common::config {
     }
   }
 
-  sysctl { 'net.core.somaxconn':
-    ensure => present,
-    val    => '1024',
-  }
+  ##Not sure why upstream added this.
+  #sysctl { 'net.core.somaxconn':
+  #  ensure => present,
+  #  val    => '1024',
+  #}
 
 }
